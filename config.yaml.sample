@@ -1,0 +1,46 @@
+defaults:
+  region: 'us-west-1'
+  aws_access_key_id: 'access-key-id'
+  aws_secret_access_key: 'secret-access-key'
+  namespace: 'AWS/RDS'
+  # There are the default values
+  #period: 600
+  #precision: 2
+  dimensions:
+    - name: 'DBInstanceIdentifier'
+      value: 'my-db-instance'
+  metrics:
+    cpu_utilization:
+      metric_name: 'CPUUtilization'
+      unit: 'Percent'
+      statistics:
+        - Average:
+            warn_threshold: 20
+            critical_threshold: 50
+        - 'Maximum'
+        - 'Minimum'
+    swap_usage:
+      metric_name: 'SwapUsage'
+      unit: 'Bytes'
+      statistics:
+        - 'Average'
+    free_storage_space:
+      metric_name: 'FreeStorageSpace'
+      unit: 'Bytes'
+      statistics:
+        - 'Minimum'
+    database_connections:
+      metric_name: 'DatabaseConnections'
+      unit: 'Count'
+      statistics:
+        - 'Average'
+    read_latency:
+      metric_name: 'ReadLatency'
+      unit: 'Seconds'
+      statistics:
+        - 'Average'
+    write_latency:
+      metric_name: 'WriteLatency'
+      unit: 'Seconds'
+      statistics:
+        - 'Average'
