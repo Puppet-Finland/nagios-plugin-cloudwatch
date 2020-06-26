@@ -21,9 +21,8 @@ class CloudWatchMetrics
     #
     # https://stackoverflow.com/questions/800122/best-way-to-convert-strings-to-symbols-in-hash
     #
-    @dimensions.each do |dimension|
-      dimension.transform_keys!(&:to_sym)
-      #dimension.transform_keys! { |key| key.to_sym }
+    @dimensions.each_with_index do |dimension, index|
+      @dimensions[index] = dimension.inject({}){|memo,(k,v)| memo[k.to_sym] = v; memo}
     end
 
     # Optional parameters
