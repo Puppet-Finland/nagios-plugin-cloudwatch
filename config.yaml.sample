@@ -10,7 +10,7 @@ defaults:
     - name: 'DBInstanceIdentifier'
       value: 'my-db-instance'
   metrics:
-    cpu_utilization:
+    cpu:
       metric_name: 'CPUUtilization'
       unit: 'Percent'
       statistics:
@@ -19,28 +19,18 @@ defaults:
             critical_threshold: 50
         - 'Maximum'
         - 'Minimum'
-    swap_usage:
+    swap:
       metric_name: 'SwapUsage'
       unit: 'Bytes'
       statistics:
         - 'Average'
-    free_storage_space:
+    disk:
       metric_name: 'FreeStorageSpace'
       unit: 'Bytes'
       statistics:
         - 'Minimum'
-    database_connections:
+    conn:
       metric_name: 'DatabaseConnections'
       unit: 'Count'
-      statistics:
-        - 'Average'
-    read_latency:
-      metric_name: 'ReadLatency'
-      unit: 'Seconds'
-      statistics:
-        - 'Average'
-    write_latency:
-      metric_name: 'WriteLatency'
-      unit: 'Seconds'
       statistics:
         - 'Average'

@@ -24,7 +24,8 @@ As the amount of metrics is generally quite large - even for a single AWS
 resource - this plugin depends on a yaml configuration file. An example is
 provided for AWS RDS, see [config.yaml.sample](config.yaml.sample). The
 assumption is that a single config file targets one AWS resource (e.g. RDS
-instance).
+instance). Note that metric names should be kept really short as Nagios plugins
+only support labels of [19 characters or less](https://nagios-plugins.org/doc/guidelines.html#AEN200).
 
 IAM user, key and policy are needed to access Cloudwatch metrics. An
 example IAM policy:
