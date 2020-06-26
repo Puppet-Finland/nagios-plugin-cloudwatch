@@ -11,6 +11,13 @@ threshold and another one exceeds the critical threshold then the plugin will
 exit with critical status (1), but include both the warning and the critical
 error in the informal error message.
 
+# Prerequisites
+
+You will need Ruby - versions 2.4.x and 2.5.x have been tested. You will also
+need aws-sdk-cloudwatch:
+
+    $ gem install aws-sdk-cloudwatch
+
 # Usage
 
 As the amount of metrics is generally quite large - even for a single AWS
