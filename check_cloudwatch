@@ -6,14 +6,20 @@ require 'optparse'
 
 class CloudWatchMetrics
 
-  attr_reader :nagios_metrics
+  # Mapping from Amazon Cloudwatch units to Nagios performance data "unit of
+  # measure".  Almost certainly incomplete at this point.
+  #
+  @@uom = { 'Bytes':   { 'perf_data': 'B' },
+            'Count':   { 'perf_data': '' },
+            'Credits': { 'perf_data': 'c' },
+            'Percent': { 'perf_data': '%' } }
 
-  def initialize(settings = {})
-    @region = settings[:region]
-    @aws_access_key_id = settings[:aws_access_key_id]
-    @aws_secret_access_key = settings[:aws_secret_access_key]
-    @namespace = settings[:namespace]
-    @dimensions = settings[:dimensions]
+  def initialize(cloudwatch_settings = {})
+    @region = cloudwatch_settings[:region]
+    @aws_access_key_id = cloudwatch_settings[:aws_access_key_id]
+    @aws_secret_access_key = cloudwatch_settings[:aws_secret_access_key]
+    @namespace = cloudwatch_settings[:namespace]
+    @dimensions = cloudwatch_settings[:dimensions]
 
     # Convert the keys in the dimensions array to Symbols. This is required by
     # the AWS get_metric_statistics method call. This requires Ruby 2.5 or
@@ -26,21 +32,19 @@ class CloudWatchMetrics
     end
 
     # Optional parameters
-    settings.has_key?(:precision) ? @precision = settings[:precision] : @precision = 2
-    settings.has_key?(:period) ? @period = settings[:period] : @period = 600
+    cloudwatch_settings.has_key?(:precision) ? @precision = cloudwatch_settings[:precision] : @precision = 2
+    cloudwatch_settings.has_key?(:period) ? @period = cloudwatch_settings[:period] : @period = 600
+    cloudwatch_settings.has_key?(:debug) ? @debug = true : @debug = false
 
     # The desired metrics
-    @metrics = settings[:metrics]
+    @desired_metrics = cloudwatch_settings[:metrics]
 
     # This will get populated by the AWS API calls
-    @metric_statistics = {}
+    @aws_metric_statistics = {}
 
     # These are the human readable matric-value pairs also used by the nagios
-    # plugin code for graph names and alert messages.
-    @nagios_metrics = {}
-
-    # This stores information about statistics that are above the defined thresholds
-    @issues = {}
+    # plugin code for graph names and alert messages, as well as alert status
+    @nagios_data = {}
 
     # This stores the aggregate exit status
     # 
@@ -58,6 +62,15 @@ class CloudWatchMetrics
     @client = Aws::CloudWatch::Client.new(region: @region)
   end
 
+  def get_flattened_metric_statistics(metric_statistics)
+      flattened_metric_statistics = metric_statistics.clone
+
+      metric_statistics.each_with_index do |statistic, index|
+        flattened_metric_statistics[index] = statistic.keys[0] if statistic.is_a?(Hash)
+      end
+      flattened_metric_statistics
+  end
+
   def populate_metrics
     base_parameters = { namespace: @namespace,
                         dimensions: @dimensions,
@@ -66,46 +79,109 @@ class CloudWatchMetrics
                         period: @period
                       }
 
-    @metrics.each_pair do |metric, parameters|
-      aws_statistics = parameters['statistics'].clone
+    @desired_metrics.each_pair do |metric_id, metric|
+      metric_name = metric['metric_name']
+      metric_statistics = metric['statistics']
+      metric_unit = metric['unit']
+
+      if @debug
+        puts "Metric ID: #{metric_id}"
+        puts "  Metric name: #{metric_name}"
+        puts "  Metric unit: #{metric_unit}"
+        puts "  Metric statistics: #{metric_statistics}"
+        puts
+      end
 
       # If a statistic (e.g. "average") has children then we must flatten it
       # for the AWS API call. We need those children entries for the optional
-      # alert thresholds.
-      parameters['statistics'].each_with_index do |statistic, index|
-        aws_statistics[index] = statistic.keys[0] if statistic.is_a?(Hash)
+      # alert thresholds
+      flattened_metric_statistics = self.get_flattened_metric_statistics(metric_statistics)
+
+      @aws_metric_statistics[metric_id] = @client.get_metric_statistics(params=base_parameters.merge(metric_name:  metric['metric_name'],
+                                                                                                     unit:         metric['unit'],
+                                                                                                     statistics:   flattened_metric_statistics))
+      if @debug
+        puts "  AWS API call returns: #{@aws_metric_statistics}"
+        puts
       end
 
-      @metric_statistics[metric] = @client.get_metric_statistics(params=base_parameters.merge(metric_name:  parameters['metric_name'],
-                                                                                              unit:         parameters['unit'],
-                                                                                              statistics:   aws_statistics))
+      metric_statistics.each do |statistic|
 
-      # Construct a human readable hash of metric names and their respective values
-      aws_statistics.each do |statistic|
-        key = "#{metric}_#{parameters['unit'].downcase}_#{statistic.downcase}"
-        value = "#{@metric_statistics[metric]['datapoints'][0][statistic.downcase.to_sym]}"
-        @nagios_metrics[key] = value.to_f
+        if @debug
+          puts "  Statistic: #{statistic}"
+          puts
+        end
+
+        if statistic.is_a?(Hash)
+          statistic_name = statistic.keys[0]
+        else
+          statistic_name = statistic
+        end
+
+        value = @aws_metric_statistics[metric_id][:datapoints][0][statistic_name.downcase]
+        nagios_metric_name = "#{metric_id}_#{statistic_name}_#{metric_unit}".downcase
+
+        @nagios_data[nagios_metric_name] = {}
+        @nagios_data[nagios_metric_name][:value] = value
+        # Convert AWS style units to Nagios style
+        @nagios_data[nagios_metric_name][:uom] = @@uom[metric_unit.to_sym][:perf_data]
+
+        # Only metrics that are hashes in the yaml file have warning or critical thresholds.
+        #
+        # - Set warning and critical thresholds for use in the performance data
+        # - Set warning and critical status for metrics
+        # - Sets the exit code if any warnings or critical issues are found
+        #
+        if statistic.is_a?(Hash)
+          warn_threshold = statistic[statistic_name]['warn_threshold']
+          critical_threshold = statistic[statistic_name]['critical_threshold']
+
+          @nagios_data[nagios_metric_name][:warn_threshold] = warn_threshold if statistic.is_a?(Hash)
+          @nagios_data[nagios_metric_name][:critical_threshold] = critical_threshold if statistic.is_a?(Hash)
+
+          if @nagios_data[nagios_metric_name][:value] > critical_threshold
+            @nagios_data[nagios_metric_name][:critical] = true
+            @exit_code = 1
+          elsif @nagios_data[nagios_metric_name][:value] > warn_threshold
+            @nagios_data[nagios_metric_name][:warning] = true
+
+            # If we already have a critical problem we don't want to override
+            # it with a warning exit code
+            @exit_code = 2 unless @exit_code == 1
+          end
+        end
+
+        if @debug
+          puts "    Value #{statistic_name}: #{value}"
+          puts
+        end
       end
+    end
+
+    if @debug
+      puts "@nagios_data:"
+      puts @nagios_data
+      puts
     end
   end
 
   # Get the "human readable" first part of Nagios plugin output
   def get_service_output
-    # Figure out if we are OK or if the status is WARN or CRITICAL
-    if @issues.empty?
-      "#{@namespace} #{@dimensions[0][:value]} OK"
-    else
-      "#{@namespace} #{@dimensions[0][:value]} #{self.issues_to_s}"
-    end
+    "#{@namespace} #{@dimensions[0][:value]} #{self.nagios_issues_to_s}"
   end
 
-  # Get the optional performance data that follows the human readable part
+  # Get the optional performance data that follows the human readable part. Format documented here:
+  #
+  # <https://nagios-plugins.org/doc/guidelines.html#AEN200>
+  #
+  # We do not use "min" or "max"
+  #
   def get_service_perf_data
     output = ""
-    @nagios_metrics.each do |key, value|
-      output << "#{key}=#{value.round(@precision)}, "
+    @nagios_data.each do |statistic, data|
+      output << "#{statistic}=#{data[:value].round(@precision)}#{data[:uom]};#{data[:warn_threshold]};#{data[:critical_threshold]};; "
     end
-    output.chomp(', ')
+    output.chomp(' ')
   end
 
   def puts_and_exit
@@ -113,41 +189,19 @@ class CloudWatchMetrics
     exit(@exit_code)
   end
 
-  def get_metric_status
-    @metrics.each do |metric, value|
-      @metrics[metric]['statistics'].each do |statistic|
-        if statistic.is_a?(Hash)
-          unit = @metrics[metric]['unit'].downcase
-          statistic_name = statistic.keys[0]
-          warn_threshold = statistic[statistic_name]['warn_threshold'].to_f
-          critical_threshold = statistic[statistic_name]['critical_threshold'].to_f
-          statistic_path = "#{metric}_#{unit}_#{statistic_name.downcase}"
-          
-          # Populate the issues hash which we will use to construct CRITICAL
-          # and WARNING messages. Also set the exit code if any warnings or
-          # critical issues are found.
-          if @nagios_metrics[statistic_path] > critical_threshold
-            @issues[statistic_path] = { status: 'critical', current: @nagios_metrics[statistic_path].round(@precision), warning: warn_threshold, critical: critical_threshold }
-            @exit_code = 1
-          elsif @nagios_metrics[statistic_path] > warn_threshold
-            @issues[statistic_path] = { status: 'warning', current: @nagios_metrics[statistic_path].round(@precision), warning: warn_threshold, critical: critical_threshold } 
-
-            # If we already have a critical problem we don't want to override
-            # it with a warning exit code
-            @exit_code = 2 unless @exit_code == 1
-          end
-        end
-      end
+  # Convert the nagios_issues has into a printable string
+  def nagios_issues_to_s
+    nagios_issues = ""
+    @nagios_data.each do |statistic, data|
+      nagios_issues << "WARNING: #{statistic}=#{data[:value].round(@precision)} exceeds the threshold of #{data[:warn_threshold]}! " if data[:warning]
+      nagios_issues << "CRITICAL: #{statistic}=#{data[:value].round(@precision)} exceeds the threshold of #{data[:warn_threshold]}! " if data[:critical]
     end
-  end
 
-  # Convert the issues has into a printable string
-  def issues_to_s
-    issues = ""
-    @issues.each do |statistic, data|
-      issues << "#{data[:status].upcase}: #{statistic}=#{data[:current]} exceeds the #{data[:status]} threshold of #{data[data[:status].to_sym]}! "
+    if nagios_issues.empty?
+      "OK"
+    else
+      nagios_issues.chomp(' ')
     end
-    issues.chomp(' ')
   end
 end
 
@@ -157,9 +211,12 @@ end
 options = {}
 
 optparse = OptionParser.new do |opts|
-  opts.banner = "Usage: check_rds -c config_file"
+  opts.banner = "Usage: check_rds -c config_file [-d]"
   opts.on( '-c', '--config file', 'Path to the config file' ) do |file|
     options[:config_file] = file
+  end
+  opts.on( '-d', '--debug', 'Print debugging information' ) do
+    options[:debug] = true
   end
   opts.on( '-H', '--host host', 'For nagios compatibility' )
   opts.on( '-h', '--help', 'Display this screen' ) do
@@ -177,21 +234,19 @@ rescue Errno::ENOENT
   exit 1
 end
 
-settings = config['defaults']
-
 # Mandatory settings
-cloudwatch_settings = { region: settings['region'],
-                        aws_access_key_id: settings['aws_access_key_id'],
-                        aws_secret_access_key: settings['aws_secret_access_key'],
-                        namespace: settings['namespace'],
-                        dimensions: settings['dimensions'],
-                        metrics: settings['metrics'] }
+cloudwatch_settings = { region: config['defaults']['region'],
+                        aws_access_key_id: config['defaults']['aws_access_key_id'],
+                        aws_secret_access_key: config['defaults']['aws_secret_access_key'],
+                        namespace: config['defaults']['namespace'],
+                        dimensions: config['defaults']['dimensions'],
+                        metrics: config['defaults']['metrics'] }
 
 # Optional settings: rounding precision (default 3) and time period (default 600 seconds)
-cloudwatch_settings.merge!(precision: settings['precision']) if settings.has_key?('precision')
-cloudwatch_settings.merge!(period: settings['period']) if settings.has_key?('period')
+cloudwatch_settings.merge!(precision: config['defaults']['precision']) if config['defaults'].has_key?('precision')
+cloudwatch_settings.merge!(period: config['defaults']['period']) if config['defaults'].has_key?('period')
+cloudwatch_settings.merge!(debug: true) if options[:debug]
 cloudwatch = CloudWatchMetrics.new(cloudwatch_settings)
 
 cloudwatch.populate_metrics
-cloudwatch.get_metric_status
 cloudwatch.puts_and_exit

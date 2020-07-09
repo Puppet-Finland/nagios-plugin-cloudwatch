@@ -49,24 +49,34 @@ After this you just call the plugin like this:
 
     $ ./check_cloudwatch -c my_db_instance.yaml
 
+To run the code in debug mode (not suitable for running in a monitoring
+system):
+
+    $ ./check_cloudwatch -c my_db_instance.yaml -d
+
 # Plugin output
 
-When no thresholds are exceeded (split to multiple lines for clarity):
+Plugin output is based on the format described here, without "min" or "max":
 
-    AWS/RDS my-db-instance OK | cpu_utilization_percent_average=6.1, \
-                                cpu_utilization_percent_maximum=7.5, \
-                                cpu_utilization_percent_minimum=5.67, \
-                                swap_usage_bytes_average=0.0,
-                                free_storage_space_bytes_minimum=103730221056.0, \
-                                database_connections_count_average=8.0, \
-                                read_latency_seconds_average=0.0, \
-                                write_latency_seconds_average=0.0
+* https://nagios-plugins.org/doc/guidelines.html#AEN200
+
+When no thresholds are exceeded (split to multiple lines for clarity) the
+output will be similar to this:
+
+    AWS/RDS my-db-instance OK | cpu_utilization_percent_average=6.1;30;50;; \
+                                cpu_utilization_percent_maximum=7.5;;;; \
+                                cpu_utilization_percent_minimum=5.67;;;; \
+                                swap_usage_bytes_average=0.0;;;;
+                                free_storage_space_bytes_minimum=103730221056.0;;;; \
+                                database_connections_count_average=8.0;;;; \
+                                read_latency_seconds_average=0.0;;;; \
+                                write_latency_seconds_average=0.0;;;;
 
 In case of warnings and/or errors the first part of the output looks different:
 
     AWS/RDS my-db-instance \
-      WARNING: cpu_utilization_percent_average=6.0 exceeds the warning threshold of 3.0! \
-      CRITICAL: database_connections_count_average=8.0 exceeds the critical threshold of 7.0!
+      WARNING: cpu_utilization_percent_average=6.0 exceeds the threshold of 3.0! \
+      CRITICAL: database_connections_count_average=8.0 exceeds the threshold of 7.0!
 
 # LICENSE
 
