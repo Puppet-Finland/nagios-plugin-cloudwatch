@@ -12,7 +12,8 @@ class CloudWatchMetrics
   @@uom = { 'Bytes':   { 'perf_data': 'B' },
             'Count':   { 'perf_data': '' },
             'Credits': { 'perf_data': 'c' },
-            'Percent': { 'perf_data': '%' } }
+            'Percent': { 'perf_data': '%' },
+            'Seconds': { 'perf_data': ''  }, }
 
   def initialize(cloudwatch_settings = {})
     @region = cloudwatch_settings[:region]
