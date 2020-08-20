@@ -73,9 +73,11 @@ class CloudWatchMetrics
   end
 
   def populate_metrics
+    # Some metrics like RDS BurstBalance do not provide _any_ datapoints unless
+    # we substract a considerable amount of seconds from the start_time.
     base_parameters = { namespace: @namespace,
                         dimensions: @dimensions,
-                        start_time: Time.now - @period,
+                        start_time: Time.now - @period - 120,
                         end_time: Time.now,
                         period: @period
                       }
