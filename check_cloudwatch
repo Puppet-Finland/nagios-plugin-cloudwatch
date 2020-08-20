@@ -212,7 +212,7 @@ end
 options = {}
 
 optparse = OptionParser.new do |opts|
-  opts.banner = "Usage: check_rds -c config_file [-d]"
+  opts.banner = "Usage: check_cloudwatch -c config_file [-d]"
   opts.on( '-c', '--config file', 'Path to the config file' ) do |file|
     options[:config_file] = file
   end
