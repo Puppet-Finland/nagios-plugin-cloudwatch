@@ -63,11 +63,11 @@ Plugin output is based on the format described here, without "min" or "max":
 When no thresholds are exceeded (split to multiple lines for clarity) the
 output will be similar to this:
 
-    AWS/RDS my-db-instance OK | cpu_utilization_percent_average=6.1;30;50;; \
-                                cpu_utilization_percent_maximum=7.5;;;; \
-                                cpu_utilization_percent_minimum=5.67;;;; \
-                                swap_usage_bytes_average=0.0;;;;
-                                free_storage_space_bytes_minimum=103730221056.0;;;; \
+    AWS/RDS my-db-instance OK | cpu_utilization_percent_average=6.1%;30;50;; \
+                                cpu_utilization_percent_maximum=7.5%;;;; \
+                                cpu_utilization_percent_minimum=5.67%;;;; \
+                                swap_usage_bytes_average=0.0B;;;;
+                                free_storage_space_bytes_minimum=103730221056.0B;;;; \
                                 database_connections_count_average=8.0;;;; \
                                 read_latency_seconds_average=0.0;;;; \
                                 write_latency_seconds_average=0.0;;;;
