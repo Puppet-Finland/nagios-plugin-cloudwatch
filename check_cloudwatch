@@ -232,14 +232,15 @@ class CloudWatchMetrics
     @nagios_data.each do |statistic, data|
       if data[:warning] || data[:critical]
         stat = "#{statistic}=#{data[:value].round(@precision)}"
-        thres = data[:warn_threshold]
       end
 
       if data[:warning]
+        thres = data[:warn_threshold]
         nagios_issues << "WARNING: #{stat} exceeds the threshold of #{thres}!"
       end
 
       if data[:critical]
+        thres = data[:critical_threshold]
         nagios_issues << "CRITICAL: #{stat} exceeds the threshold of #{thres}!"
       end
     end
