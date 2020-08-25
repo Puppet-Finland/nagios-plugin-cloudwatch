@@ -174,13 +174,13 @@ class CloudWatchMetrics
 
           if @nagios_data[nagios_metric_name][:value] > crit
             @nagios_data[nagios_metric_name][:critical] = true
-            @exit_code = 1
+            @exit_code = 2
           elsif @nagios_data[nagios_metric_name][:value] > warn
             @nagios_data[nagios_metric_name][:warning] = true
 
             # If we already have a critical problem we don't want to override
             # it with a warning exit code
-            @exit_code = 2 unless @exit_code == 1
+            @exit_code = 1 unless @exit_code == 2
           end
         end
 
