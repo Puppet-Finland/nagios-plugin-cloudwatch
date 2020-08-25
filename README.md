@@ -54,6 +54,14 @@ system):
 
     $ ./check_cloudwatch -c my_db_instance.yaml -d
 
+# Settings
+
+There are a few global (per nagios plugin instance) settings that you may want to tweak:
+
+* precision: the rounding precision for floats - defaults to 2
+* period: the metric period to use - defaults 300 (5 minutes)
+* metric_age: reduce this many seconds from start and end time - useful with some odd metrics like BurstBalance that fail to provide data point for "now - period" 
+
 # Plugin output
 
 Plugin output is based on the format described here, without "min" or "max":

@@ -6,6 +6,7 @@ defaults:
   # There are the default values
   #period: 600
   #precision: 2
+  #metric_age: 0
   dimensions:
     - name: 'DBInstanceIdentifier'
       value: 'my-db-instance'

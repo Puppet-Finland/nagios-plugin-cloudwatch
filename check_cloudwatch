@@ -48,6 +48,12 @@ class CloudWatchMetrics
                 600
               end
 
+    @metric_age = if cloudwatch_settings.key?(:metric_age)
+                      cloudwatch_settings[:metric_age]
+                    else
+                      0
+                    end
+
     @debug = if cloudwatch_settings.key?(:debug)
                true
              else
@@ -98,8 +104,8 @@ class CloudWatchMetrics
     # we substract a considerable amount of seconds from the start_time.
     base_parameters = { namespace: @namespace,
                         dimensions: @dimensions,
-                        start_time: Time.now - @period - 120,
-                        end_time: Time.now,
+                        start_time: Time.now - @period - @metric_age,
+                        end_time: Time.now - @metric_age,
                         period: @period }
 
     @desired_metrics.each_pair do |metric_id, metric|
@@ -300,6 +306,10 @@ end
 
 if config['defaults'].key?('period')
   cloudwatch_settings.merge!(period: config['defaults']['period'])
+end
+
+if config['defaults'].key?('metric_age')
+    cloudwatch_settings.merge!(metric_age: config['defaults']['metric_age'])
 end
 
 cloudwatch_settings.merge!(debug: true) if options[:debug]
