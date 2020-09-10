@@ -134,16 +134,10 @@ class CloudWatchMetrics
     @desired_metrics.each_pair do |metric_id, metric|
       @aws_metric_statistics[metric_id] = get_metric_statistics(metric_id, metric)
 
-      if @debug
-        puts "  AWS API call returns: #{@aws_metric_statistics}"
-        puts
-      end
+      print "  AWS API call returns: #{@aws_metric_statistics}\n\n" if @debug
 
       metric['statistics'].each do |statistic|
-        if @debug
-          puts "  Statistic: #{statistic}"
-          puts
-        end
+        print "  Statistic: #{statistic}\n\n" if @debug
 
         statistic_name =  if statistic.is_a?(Hash)
                             statistic.keys[0]
@@ -153,54 +147,50 @@ class CloudWatchMetrics
 
         aws_stat = statistic_name.downcase
         value = @aws_metric_statistics[metric_id][:datapoints][0][aws_stat]
-        nagios_metric_name = "#{metric_id}_#{statistic_name}_#{metric['unit']}"
-        nagios_metric_name.downcase!
 
-        @nagios_data[nagios_metric_name] = {}
-        @nagios_data[nagios_metric_name][:value] = value
-        # Convert AWS style units to Nagios style
-        uom = @@uom[metric['unit'].to_sym][:perf_data]
-        @nagios_data[nagios_metric_name][:uom] = uom
-        # Only metrics that are hashes in the yaml file have warning or
-        # critical thresholds.
-        #
-        # - Set warning and critical thresholds for use in the performance data
-        # - Set warning and critical status for metrics
-        # - Sets the exit code if any warnings or critical issues are found
-        #
-        if statistic.is_a?(Hash)
-          warn = statistic[statistic_name]['warn_threshold']
-          crit = statistic[statistic_name]['critical_threshold']
+        nagios_data(metric_id, statistic, statistic_name, metric['unit'], value)
 
-          if statistic.is_a?(Hash)
-            @nagios_data[nagios_metric_name][:warn_threshold] = warn
-            @nagios_data[nagios_metric_name][:critical_threshold] = crit
-          end
-
-          if @nagios_data[nagios_metric_name][:value] > crit
-            @nagios_data[nagios_metric_name][:critical] = true
-            @exit_code = 2
-          elsif @nagios_data[nagios_metric_name][:value] > warn
-            @nagios_data[nagios_metric_name][:warning] = true
-
-            # If we already have a critical problem we don't want to override
-            # it with a warning exit code
-            @exit_code = 1 unless @exit_code == 2
-          end
-        end
-
-        if @debug
-          puts "    Value #{statistic_name}: #{value}"
-          puts
-        end
+        print "@nagios_data: #{@nagios_data}\n\n" if @debug
       end
     end
+  end
 
-    return unless @debug
+  def nagios_data(metric_id, statistic, statistic_name, metric_unit, value)
+    nagios_metric_name = "#{metric_id}_#{statistic_name}_#{metric_unit}"
+    nagios_metric_name.downcase!
+    @nagios_data[nagios_metric_name] = {}
+    @nagios_data[nagios_metric_name][:value] = value
+    # Convert AWS style units to Nagios style
+    uom = @@uom[metric_unit.to_sym][:perf_data]
+    @nagios_data[nagios_metric_name][:uom] = uom
+    # Only metrics that are hashes in the yaml file have warning or
+    # critical thresholds.
+    #
+    # - Set warning and critical thresholds for use in the performance data
+    # - Set warning and critical status for metrics
+    # - Sets the exit code if any warnings or critical issues are found
+    #
+    if statistic.is_a?(Hash)
+      warn = statistic[statistic_name]['warn_threshold']
+      crit = statistic[statistic_name]['critical_threshold']
 
-    puts '@nagios_data:'
-    puts @nagios_data
-    puts
+      if statistic.is_a?(Hash)
+        @nagios_data[nagios_metric_name][:warn_threshold] = warn
+        @nagios_data[nagios_metric_name][:critical_threshold] = crit
+      end
+
+      if @nagios_data[nagios_metric_name][:value] > crit
+        @nagios_data[nagios_metric_name][:critical] = true
+        @exit_code = 2
+      elsif @nagios_data[nagios_metric_name][:value] > warn
+        @nagios_data[nagios_metric_name][:warning] = true
+
+        # If we already have a critical problem we don't want to override
+        # it with a warning exit code
+        @exit_code = 1 unless @exit_code == 2
+      end
+    end
+    print "    Value #{statistic_name}: #{value}\n\n" if @debug
   end
 
   # Get the "human readable" first part of Nagios plugin output
