@@ -62,6 +62,11 @@ There are a few global (per nagios plugin instance) settings that you may want t
 * period: the metric period to use - defaults 300 (5 minutes)
 * metric_age: reduce this many seconds from start and end time - useful with some odd metrics like BurstBalance that fail to provide data point for "now - period" 
 
+Each metric also has an optional parameter called _high_is_good_. When
+high_is_good is set to true (boolean) alerts will be sent if the a statistic's
+value drops _below_ the configured threshold. This is useful with RDS
+BurstBalance for example where a low percentage may be a symptom of a problem.
+
 # Plugin output
 
 Plugin output is based on the format described here, without "min" or "max":

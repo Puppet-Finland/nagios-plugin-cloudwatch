@@ -153,6 +153,14 @@ class CloudWatchMetrics
     end
   end
 
+  def alert?(value, threshold, high_is_good)
+    if high_is_good
+      value < threshold && true || false
+    else
+      value > threshold && true || false
+    end
+  end
+
   def nagios_data(metric, metric_id, statistic, statistic_name, value)
     nagios_metric_name = "#{metric_id}_#{statistic_name}_#{metric['unit']}"
     nagios_metric_name.downcase!
@@ -164,6 +172,7 @@ class CloudWatchMetrics
     # Only metrics that are hashes in the yaml file have warning or
     # critical thresholds.
     #
+    # - Ensure that we alert on low number if explicitly told so
     # - Set warning and critical thresholds for use in the performance data
     # - Set warning and critical status for metrics
     # - Sets the exit code if any warnings or critical issues are found
@@ -177,12 +186,11 @@ class CloudWatchMetrics
         @nagios_data[nagios_metric_name][:critical_threshold] = crit
       end
 
-      if @nagios_data[nagios_metric_name][:value] > crit
+      if alert?(@nagios_data[nagios_metric_name][:value], crit, metric['high_is_good'])
         @nagios_data[nagios_metric_name][:critical] = true
         @exit_code = 2
-      elsif @nagios_data[nagios_metric_name][:value] > warn
+      elsif alert?(@nagios_data[nagios_metric_name][:value], warn, metric['high_is_good'])
         @nagios_data[nagios_metric_name][:warning] = true
-
         # If we already have a critical problem we don't want to override
         # it with a warning exit code
         @exit_code = 1 unless @exit_code == 2
@@ -229,12 +237,12 @@ class CloudWatchMetrics
 
       if data[:warning]
         thres = data[:warn_threshold]
-        nagios_issues << "WARNING: #{stat} exceeds the threshold of #{thres}!"
+        nagios_issues << "WARNING: #{stat} has passed the threshold of #{thres}!"
       end
 
       if data[:critical]
         thres = data[:critical_threshold]
-        nagios_issues << "CRITICAL: #{stat} exceeds the threshold of #{thres}!"
+        nagios_issues << "CRITICAL: #{stat} has passed the threshold of #{thres}!"
       end
     end
 
