@@ -98,6 +98,8 @@ class CloudWatchMetrics
   end
 
   def get_metric_statistics(metric_id, metric)
+    # Some metrics like RDS BurstBalance do not provide _any_ datapoints unless
+    # we substract a considerable amount of seconds from the start_time.
     base_parameters = { namespace: @namespace,
                         dimensions: @dimensions,
                         start_time: Time.now - @period - @metric_age,
@@ -132,9 +134,6 @@ class CloudWatchMetrics
   end
 
   def populate_metrics
-    # Some metrics like RDS BurstBalance do not provide _any_ datapoints unless
-    # we substract a considerable amount of seconds from the start_time.
-
     @desired_metrics.each_pair do |metric_id, metric|
       @aws_metric_statistics[metric_id] = get_metric_statistics(metric_id, metric)
 
@@ -147,20 +146,20 @@ class CloudWatchMetrics
         aws_stat = statistic_name.downcase
         value = @aws_metric_statistics[metric_id][:datapoints][0][aws_stat]
 
-        nagios_data(metric_id, statistic, statistic_name, metric['unit'], value)
+        nagios_data(metric, metric_id, statistic, statistic_name, value)
 
         print "@nagios_data: #{@nagios_data}\n\n" if @debug
       end
     end
   end
 
-  def nagios_data(metric_id, statistic, statistic_name, metric_unit, value)
-    nagios_metric_name = "#{metric_id}_#{statistic_name}_#{metric_unit}"
+  def nagios_data(metric, metric_id, statistic, statistic_name, value)
+    nagios_metric_name = "#{metric_id}_#{statistic_name}_#{metric['unit']}"
     nagios_metric_name.downcase!
     @nagios_data[nagios_metric_name] = {}
     @nagios_data[nagios_metric_name][:value] = value
     # Convert AWS style units to Nagios style
-    uom = @@uom[metric_unit.to_sym][:perf_data]
+    uom = @@uom[metric['unit'].to_sym][:perf_data]
     @nagios_data[nagios_metric_name][:uom] = uom
     # Only metrics that are hashes in the yaml file have warning or
     # critical thresholds.
