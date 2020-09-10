@@ -99,48 +99,47 @@ class CloudWatchMetrics
     flattened_metric_statistics
   end
 
-  def populate_metrics
-    # Some metrics like RDS BurstBalance do not provide _any_ datapoints unless
-    # we substract a considerable amount of seconds from the start_time.
+  def get_metric_statistics(metric_id, metric)
     base_parameters = { namespace: @namespace,
                         dimensions: @dimensions,
                         start_time: Time.now - @period - @metric_age,
                         end_time: Time.now - @metric_age,
                         period: @period }
 
+    if @debug
+      puts "Metric ID: #{metric_id}"
+      puts "  Metric name: #{metric['metric_name']}"
+      puts "  Metric unit: #{metric['unit']}"
+      puts "  Metric statistics: #{metric['statistics']}"
+      puts
+    end
+
+    # If a statistic (e.g. "average") has children then we must flatten it
+    # for the AWS API call. We need those children entries for the optional
+    # alert thresholds
+    flattened_metric_statistics = self.flattened_metric_statistics(metric['statistics'])
+
+    metric_hash = { metric_name: metric['metric_name'],
+                    unit: metric['unit'],
+                    statistics: flattened_metric_statistics }
+
+    params = base_parameters.merge(metric_hash)
+    @client.get_metric_statistics(params)
+  end
+
+  def populate_metrics
+    # Some metrics like RDS BurstBalance do not provide _any_ datapoints unless
+    # we substract a considerable amount of seconds from the start_time.
+
     @desired_metrics.each_pair do |metric_id, metric|
-      metric_name = metric['metric_name']
-      metric_statistics = metric['statistics']
-      metric_unit = metric['unit']
-
-      if @debug
-        puts "Metric ID: #{metric_id}"
-        puts "  Metric name: #{metric_name}"
-        puts "  Metric unit: #{metric_unit}"
-        puts "  Metric statistics: #{metric_statistics}"
-        puts
-      end
-
-      # If a statistic (e.g. "average") has children then we must flatten it
-      # for the AWS API call. We need those children entries for the optional
-      # alert thresholds
-      flattened_metric_statistics = self.flattened_metric_statistics(metric_statistics)
-
-      metric_hash = { metric_name: metric['metric_name'],
-                      unit: metric['unit'],
-                      statistics: flattened_metric_statistics }
-
-      params = base_parameters.merge(metric_hash)
-      stat = @client.get_metric_statistics(params)
-
-      @aws_metric_statistics[metric_id] = stat
+      @aws_metric_statistics[metric_id] = get_metric_statistics(metric_id, metric)
 
       if @debug
         puts "  AWS API call returns: #{@aws_metric_statistics}"
         puts
       end
 
-      metric_statistics.each do |statistic|
+      metric['statistics'].each do |statistic|
         if @debug
           puts "  Statistic: #{statistic}"
           puts
@@ -154,13 +153,13 @@ class CloudWatchMetrics
 
         aws_stat = statistic_name.downcase
         value = @aws_metric_statistics[metric_id][:datapoints][0][aws_stat]
-        nagios_metric_name = "#{metric_id}_#{statistic_name}_#{metric_unit}"
+        nagios_metric_name = "#{metric_id}_#{statistic_name}_#{metric['unit']}"
         nagios_metric_name.downcase!
 
         @nagios_data[nagios_metric_name] = {}
         @nagios_data[nagios_metric_name][:value] = value
         # Convert AWS style units to Nagios style
-        uom = @@uom[metric_unit.to_sym][:perf_data]
+        uom = @@uom[metric['unit'].to_sym][:perf_data]
         @nagios_data[nagios_metric_name][:uom] = uom
         # Only metrics that are hashes in the yaml file have warning or
         # critical thresholds.
