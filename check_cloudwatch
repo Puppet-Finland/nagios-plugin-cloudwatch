@@ -299,18 +299,9 @@ cloudwatch_settings = {
 
 # Optional settings: rounding precision (default 3) and time period (default
 # 600 seconds)
-if config['defaults'].key?('precision')
-  cloudwatch_settings.merge!(precision: config['defaults']['precision'])
-end
-
-if config['defaults'].key?('period')
-  cloudwatch_settings.merge!(period: config['defaults']['period'])
-end
-
-if config['defaults'].key?('metric_age')
-    cloudwatch_settings.merge!(metric_age: config['defaults']['metric_age'])
-end
-
+cloudwatch_settings.merge!(precision: config['defaults']['precision']) if config['defaults'].key?('precision')
+cloudwatch_settings.merge!(period: config['defaults']['period']) if config['defaults'].key?('period')
+cloudwatch_settings.merge!(metric_age: config['defaults']['metric_age']) if config['defaults'].key?('metric_age')
 cloudwatch_settings.merge!(debug: true) if options[:debug]
 cloudwatch = CloudWatchMetrics.new(cloudwatch_settings)
 
