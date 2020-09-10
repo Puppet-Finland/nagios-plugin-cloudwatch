@@ -49,10 +49,10 @@ class CloudWatchMetrics
               end
 
     @metric_age = if cloudwatch_settings.key?(:metric_age)
-                      cloudwatch_settings[:metric_age]
-                    else
-                      0
-                    end
+                    cloudwatch_settings[:metric_age]
+                  else
+                    0
+                  end
 
     @debug = if cloudwatch_settings.key?(:debug)
                true
@@ -118,7 +118,7 @@ class CloudWatchMetrics
     params = base_parameters.merge(metric_hash)
 
     if @debug
-      puts "Requesting metric:"
+      puts 'Requesting metric:'
       puts "  Nagios metric ID: #{metric_id}"
       puts "  Metric name: #{metric_hash[:metric_name]}"
       puts "  Metric unit: #{metric_hash[:unit]}"
