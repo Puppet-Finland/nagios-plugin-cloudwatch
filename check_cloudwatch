@@ -106,14 +106,6 @@ class CloudWatchMetrics
                         end_time: Time.now - @metric_age,
                         period: @period }
 
-    if @debug
-      puts "Metric ID: #{metric_id}"
-      puts "  Metric name: #{metric['metric_name']}"
-      puts "  Metric unit: #{metric['unit']}"
-      puts "  Metric statistics: #{metric['statistics']}"
-      puts
-    end
-
     # If a statistic (e.g. "average") has children then we must flatten it
     # for the AWS API call. We need those children entries for the optional
     # alert thresholds
@@ -124,6 +116,16 @@ class CloudWatchMetrics
                     statistics: flattened_metric_statistics }
 
     params = base_parameters.merge(metric_hash)
+
+    if @debug
+      puts "Requesting metric:"
+      puts "  Nagios metric ID: #{metric_id}"
+      puts "  Metric name: #{metric_hash[:metric_name]}"
+      puts "  Metric unit: #{metric_hash[:unit]}"
+      puts "  Metric statistics: #{metric_hash[:statistics]}"
+      puts
+    end
+
     @client.get_metric_statistics(params)
   end
 
