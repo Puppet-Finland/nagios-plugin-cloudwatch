@@ -92,9 +92,7 @@ class CloudWatchMetrics
     flattened_metric_statistics = metric_statistics.clone
 
     metric_statistics.each_with_index do |statistic, index|
-      if statistic.is_a?(Hash)
-        flattened_metric_statistics[index] = statistic.keys[0]
-      end
+      flattened_metric_statistics[index] = statistic.keys[0] if statistic.is_a?(Hash)
     end
     flattened_metric_statistics
   end
@@ -129,6 +127,10 @@ class CloudWatchMetrics
     @client.get_metric_statistics(params)
   end
 
+  def flatten_statistic(statistic)
+    statistic.is_a?(Hash) && statistic.keys[0] || statistic
+  end
+
   def populate_metrics
     # Some metrics like RDS BurstBalance do not provide _any_ datapoints unless
     # we substract a considerable amount of seconds from the start_time.
@@ -141,12 +143,7 @@ class CloudWatchMetrics
       metric['statistics'].each do |statistic|
         print "  Statistic: #{statistic}\n\n" if @debug
 
-        statistic_name =  if statistic.is_a?(Hash)
-                            statistic.keys[0]
-                          else
-                            statistic
-                          end
-
+        statistic_name = flatten_statistic(statistic)
         aws_stat = statistic_name.downcase
         value = @aws_metric_statistics[metric_id][:datapoints][0][aws_stat]
 
